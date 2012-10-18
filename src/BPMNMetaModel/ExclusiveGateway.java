@@ -18,34 +18,41 @@ public class ExclusiveGateway extends Gateway{
     
     public ExclusiveGateway(String id) {
         super(id);
-        incoming = new ArrayList();
-        outgoing = new ArrayList();
+        this.incoming = new ArrayList();
+        this.outgoing = new ArrayList();
     }
 
     public ExclusiveGateway(String id, String name) {
         super(id, name);
-        incoming = new ArrayList();
-        outgoing = new ArrayList();
+        this.incoming = new ArrayList();
+        this.outgoing = new ArrayList();
     }
 
     @Override
-    public SequenceFlow getIncoming() {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public List<SequenceFlow> getIncoming() {
+        return this.incoming;
     }
 
     @Override
-    public void setIncoming(SequenceFlow flow) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void setIncoming(List<SequenceFlow> incomingFlows) {
+        this.incoming = incomingFlows;
     }
 
     @Override
-    public SequenceFlow getOutgoing() {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public List<SequenceFlow> getOutgoing() {
+        return this.outgoing;
     }
 
     @Override
-    public void setOutgoing(SequenceFlow flow) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void setOutgoing(List<SequenceFlow> outgoingFlows) {
+        this.outgoing = outgoingFlows;
+    }
+    
+    public boolean addOutgoing(SequenceFlow seq){
+        return this.outgoing.add(seq);
+    }
+    public boolean addIncoming(SequenceFlow seq){
+        return this.incoming.add(seq);
     }
     
 }
