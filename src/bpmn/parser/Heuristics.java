@@ -9,6 +9,8 @@ import BPMNMetaModel.EndEvent;
 import BPMNMetaModel.ExclusiveGateway;
 import BPMNMetaModel.FlowNode;
 import BPMNMetaModel.Fragment;
+import BPMNMetaModel.Gateway;
+import BPMNMetaModel.ParallelGateway;
 import BPMNMetaModel.SequenceFlow;
 import BPMNMetaModel.StartEvent;
 import KAOSMetaModel.Goal;
@@ -17,6 +19,8 @@ import KAOSMetaModel.RefinementRelation;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
+import java.util.Stack;
 import parserFunctions.NLP;
 import parserFunctions.PosTagger;
 
@@ -183,37 +187,37 @@ public class Heuristics {
     }
    
    //takes the form EndCondition1 OR EndCondition2 when StartCondition
-   public static String MultipleEndEvents(StartEvent startEvent, List<EndEvent> desiredEndEvents){
-        String goal="";
-        PosTagger posTagger = new PosTagger();
-        NLP processor = new NLP();
-        String[] startVerb = posTagger.getVerb(startEvent.getName());
-        String startNoun = posTagger.getNoun(startEvent.getName());
-        String startCondition="";
-        //if there is no verb, just use the label
-        if (startVerb[0].contentEquals(""))
-            startCondition = startEvent.getName().toLowerCase();
-        //if there is a verb, use the past tense
-        else            
-            startCondition = processor.generateCondition(startVerb,startNoun);
-        
-        String endCondition = "";
-        for (int i = 0; i<desiredEndEvents.size();i++){
-            String[] endVerb = posTagger.getVerb(desiredEndEvents.get(i).getName());
-            String endNoun = posTagger.getNoun(desiredEndEvents.get(i).getName());
-            
-            if (i>0)
-                endCondition+=" OR ";
-        
-            //if there is no verb, just use the label
-            if (endVerb[0].contentEquals(""))
-                endCondition+=desiredEndEvents.get(i).getName();
-            //if there is a verb, use the past tense
-            else endCondition += processor.generateCondition(endVerb, endNoun);
-        }
-       goal = "Achieve["+endCondition + " when "+ startCondition+"]"; 
-       return goal;
-   }
+//   public static String MultipleEndEvents(StartEvent startEvent, List<EndEvent> desiredEndEvents){
+//        String goal="";
+//        PosTagger posTagger = new PosTagger();
+//        NLP processor = new NLP();
+//        String[] startVerb = posTagger.getVerb(startEvent.getName());
+//        String startNoun = posTagger.getNoun(startEvent.getName());
+//        String startCondition="";
+//        //if there is no verb, just use the label
+//        if (startVerb[0].contentEquals(""))
+//            startCondition = startEvent.getName().toLowerCase();
+//        //if there is a verb, use the past tense
+//        else            
+//            startCondition = processor.generateCondition(startVerb,startNoun);
+//        
+//        String endCondition = "";
+//        for (int i = 0; i<desiredEndEvents.size();i++){
+//            String[] endVerb = posTagger.getVerb(desiredEndEvents.get(i).getName());
+//            String endNoun = posTagger.getNoun(desiredEndEvents.get(i).getName());
+//            
+//            if (i>0)
+//                endCondition+=" OR ";
+//        
+//            //if there is no verb, just use the label
+//            if (endVerb[0].contentEquals(""))
+//                endCondition+=desiredEndEvents.get(i).getName();
+//            //if there is a verb, use the past tense
+//            else endCondition += processor.generateCondition(endVerb, endNoun);
+//        }
+//       goal = "Achieve["+endCondition + " when "+ startCondition+"]"; 
+//       return goal;
+//   }
    
    //takes the form Avoid [Undesired End Condition when Start condition]
    public static String[] AvoidEndEvents(StartEvent startEvent, List<EndEvent> undesiredEndEvents){
@@ -313,6 +317,68 @@ public class Heuristics {
        }
        return goals;
    }
+   
+   //build the end condition
+   private static String traverseGatewaysStructure(FlowNode node, Fragment fragment, String condition){
+        if(node instanceof StartEvent){
+            return traverseGatewaysStructure(((SequenceFlow)fragment.getFlowBySource(node).get(0)).getTarget(),fragment,condition);
+        }
+
+        else if (node instanceof ExclusiveGateway){
+            String result="";
+            if(node.getOutgoing().size()>1){
+                result+="(";
+                System.out.println("Visited a diverging exclusive gateway");
+                Iterator itr = fragment.getFlowBySource(node).iterator();
+                while (itr.hasNext()){
+                    SequenceFlow seq = (SequenceFlow)itr.next();
+                    System.out.println("Preparing to visit "+seq.getTarget().getName());
+                    result += traverseGatewaysStructure(seq.getTarget(),fragment,result);
+                    result +=" OR ";
+                }
+                result = result.substring(0, result.length()-4);
+                result+=" )";
+            }           
+            return result;
+        }
+        
+        else if (node instanceof ParallelGateway){
+            String result="";
+            if(node.getOutgoing().size()>1){
+                result+="(";
+                System.out.println("Visited a diverging parallel gateway");
+                Iterator itr = fragment.getFlowBySource(node).iterator();
+                while (itr.hasNext()){
+                    SequenceFlow seq = (SequenceFlow)itr.next();
+                    result += traverseGatewaysStructure(seq.getTarget(),fragment,result);
+                    result+=" AND ";
+                }
+                result = result.substring(0, result.length()-5);
+                result+=" )";
+            }           
+            return result;
+        }
+        else if (node instanceof EndEvent){
+            return node.getName();
+        }
+        else 
+            return condition;
+        
+   }
+   //fragment includes acceptable end events, parallel and exclusive gateways
+   //it assumes fragment.getLast returns an acceptable end event
+   public static String MultipleEndEvents(Fragment fragment){
+       String goal = "";
+       String endCondition="";
+       String startCondition=fragment.getFirst().getName();
+       
+       
+       FlowNode current = fragment.getFirst();
+       endCondition+=traverseGatewaysStructure(current, fragment, endCondition);
+       
+       goal = endCondition+" when "+startCondition;
+       return goal;
+   }
        
    public static List<String> ExclusiveGateways(Fragment fragment){
        List<String> goals = new ArrayList();
@@ -357,6 +423,60 @@ public class Heuristics {
    //HAPPY PATH Starts from end event and finished to Start event !!!!
    //works only with diverging gateways
    //three elements: get the last gateway: maintain gateway condition, achive previous activity when starte event, achieve end event when maintain and achieve prev act
+   
+   
+   //the fragment contains all end events, all gateways, any activity that comes right before a gateway and the start event
+   public static GoalModel TopDownRefinement(Fragment happyPathStructure){
+       GoalModel goals = new GoalModel();
+       Iterator itr = happyPathStructure.iterator();
+       FlowNode end = null;
+       while(itr.hasNext()){
+           FlowNode node = (FlowNode)itr.next();
+           if (node instanceof EndEvent){
+               end = node;
+               break;
+           }
+           
+       }
+       itr = happyPathStructure.iterator();
+       FlowNode start = null;
+       while(itr.hasNext()){
+       FlowNode node = (FlowNode)itr.next();
+       if (node instanceof StartEvent){
+           start = node;
+           break;
+       }
+           
+       }
+       ExclusiveGateway gateway = null;
+       SequenceFlow flow = null;
+       Activity act = null;
+       if (happyPathStructure.containsExclusiveDivergingGateway()){
+           gateway = happyPathStructure.getExclusiveDivergingGateway(end);
+           flow = happyPathStructure.getSequenceFlow(gateway, end);
+           act = (Activity) happyPathStructure.getFlowByTarget(gateway).get(0).getSource();
+       }
+       
+       Goal parentGoal = new Goal();
+       parentGoal = getAchieveGoal( start, end);
+       if (happyPathStructure.containsExclusiveDivergingGateway()){
+           RefinementRelation refinement = new RefinementRelation (parentGoal);
+           Goal maintGoal = getMaintainGoal(gateway, flow, act);
+           goals.addGoal(parentGoal);
+           refinement.addChildGoal(maintGoal);
+           goals.addGoal(maintGoal);
+           Goal firstAchieveGoal = getAchieveGoal(start, act);
+           refinement.addChildGoal(firstAchieveGoal);
+           goals.addGoal(firstAchieveGoal);
+           Goal finalAchieveGoal = getAchieveGoal(act,gateway,flow,end);
+           refinement.addChildGoal(finalAchieveGoal);
+           goals.addGoal(finalAchieveGoal);
+           goals.addRefinement(refinement);
+           parentGoal.addRefinement(refinement);
+       }
+   
+       return goals;
+   }
    
    
    public static GoalModel HappyPath(Fragment happyPath){

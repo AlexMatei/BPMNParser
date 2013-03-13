@@ -14,7 +14,7 @@ import java.util.List;
  */
 public class BPMNProcess {
     private String name;
-    private EndEvent desiredEndEvent;
+    private List<EndEvent> acceptableEndEvents;
     private List<Lane> lanes;
     private List<SequenceFlow> sequenceFlows;
     private List<Activity> activities;
@@ -22,6 +22,7 @@ public class BPMNProcess {
     private List<EndEvent> endEvents;
     private List<EndEvent> exceptionalEndEvents;
     private List<ExclusiveGateway> exclusiveGateways;
+    private List<ParallelGateway> parallelGateways;
     
     
     
@@ -34,6 +35,7 @@ public class BPMNProcess {
         endEvents = new ArrayList();
         exceptionalEndEvents = new ArrayList();
         exclusiveGateways = new ArrayList();
+        parallelGateways = new ArrayList();
     }
     
     //Process Name
@@ -97,12 +99,34 @@ public class BPMNProcess {
     
     //desired End Event
 
-    public EndEvent getDesiredEndEvent() {
-        return desiredEndEvent;
+    public List<EndEvent> getAcceptableEndEvents() {
+        List <EndEvent> acceptableEv = new ArrayList();
+        Iterator itr = this.endEvents.iterator();
+        while (itr.hasNext()){
+            EndEvent ev = (EndEvent) itr.next();
+            if (!exceptionalEndEvents.contains((EndEvent)ev))
+                acceptableEv.add(ev);
+        }
+        return acceptableEv;
     }
 
-    public void setDesiredEndEvent(EndEvent desiredEndEvent) {
-        this.desiredEndEvent = desiredEndEvent;
+    public void setDesiredEndEvent(List <EndEvent>acceptableEndEvents) {
+        this.acceptableEndEvents = acceptableEndEvents;
+    }
+    
+    public boolean addAcceptableEndEvent(EndEvent event){
+        return this.acceptableEndEvents.add(event);
+    }
+    
+    //comparison by name
+    public boolean isAcceptableEndEvent(FlowNode node){
+        Iterator itr = this.getAcceptableEndEvents().iterator();
+        while (itr.hasNext()){
+            EndEvent ev = (EndEvent) itr.next();
+            if (((Event)ev).getID().contentEquals(node.getID()))
+                return true;
+        }
+        return false;
     }
     
     //exceptional End Event
@@ -119,6 +143,8 @@ public class BPMNProcess {
         return this.exceptionalEndEvents.add(event);
     }
     
+    
+   
     
     //Activity
     public boolean addActivity(Activity act){
@@ -199,6 +225,24 @@ public class BPMNProcess {
     
     public List<ExclusiveGateway> getExclusiveGateways(){
         return this.exclusiveGateways;
+    }
+    
+    public boolean addParallelGateway(ParallelGateway gateway){
+        return this.parallelGateways.add(gateway);
+    }
+    
+    public ParallelGateway getParallelGateway(String ID){
+        Iterator itr = this.parallelGateways.iterator();
+        while (itr.hasNext()){
+            ParallelGateway gateway = (ParallelGateway) itr.next();
+            if (((ParallelGateway)gateway).getID().contentEquals(ID))
+                return (ParallelGateway)gateway;
+        }
+        return null;
+    }
+    
+    public List<ParallelGateway> getParallelGateways(){
+        return this.parallelGateways;
     }
     
 }

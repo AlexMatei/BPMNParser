@@ -112,6 +112,8 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
         jButton9 = new javax.swing.JButton();
         jSeparator6 = new javax.swing.JToolBar.Separator();
         jButton10 = new javax.swing.JButton();
+        jSeparator7 = new javax.swing.JToolBar.Separator();
+        jButton11 = new javax.swing.JButton();
         jScrollPane2 = new javax.swing.JScrollPane();
         jTable1 = new javax.swing.JTable();
         menuBar = new javax.swing.JMenuBar();
@@ -241,7 +243,7 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
         jToolBar1.add(jButton5);
         jToolBar1.add(jSeparator3);
 
-        jButton6.setText("H3");
+        jButton6.setText("EndEvents");
         jButton6.setFocusable(false);
         jButton6.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
         jButton6.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
@@ -298,6 +300,18 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
             }
         });
         jToolBar1.add(jButton10);
+        jToolBar1.add(jSeparator7);
+
+        jButton11.setText("TopDown Refinement");
+        jButton11.setFocusable(false);
+        jButton11.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        jButton11.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        jButton11.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton11ActionPerformed(evt);
+            }
+        });
+        jToolBar1.add(jButton11);
 
         jTable1.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
@@ -394,14 +408,14 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
         }
         if (parser.getEndEvents().size()>1){
             List<String> endEvLabels = parser.getEndEventLabels();
-            this.jList1.setListData(endEvLabels.toArray());
-            JOptionPane.showConfirmDialog(this, this.jPanel1, "Desired Process Outcome", JOptionPane.OK_CANCEL_OPTION);
-            System.out.println("Selected event name is "+(String)this.jList1.getSelectedValue());
-            this.parser.setDesiredEndEvent((String)this.jList1.getSelectedValue());
+            //this.jList1.setListData(endEvLabels.toArray());
+            //JOptionPane.showConfirmDialog(this, this.jPanel1, "Acceptable Process Outcome", JOptionPane.OK_CANCEL_OPTION);
+            //System.out.println("Selected event name is "+(String)this.jList1.getSelectedValue());
+            //this.parser.setDesiredEndEvent((String)this.jList1.getSelectedValue());
             
-//            this.jList2.setListData(endEvLabels.toArray());
-//            JOptionPane.showConfirmDialog(this, this.jPanel2, "Exceptional Process Outcomes", JOptionPane.OK_CANCEL_OPTION);
-//            this.parser.setExceptionalEndEvents(this.jList2.getSelectedValuesList());
+            this.jList2.setListData(endEvLabels.toArray());
+            JOptionPane.showConfirmDialog(this, this.jPanel2, "Exceptional Process Outcomes", JOptionPane.OK_CANCEL_OPTION);
+            this.parser.setExceptionalEndEvents(this.jList2.getSelectedValuesList());
             
             
             
@@ -419,29 +433,29 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
 //                    undesiredEndEvents.add(this.jList1.getModel().getElementAt(i));
 //            } 
 
-            this.jTextArea1.append("The process has more than one end event, labeled as follows:\n");
-            Iterator itr = parser.getEndEventLabels().iterator();
-            while(itr.hasNext()) {
-                String endEventName = (String)itr.next(); 
-                this.jTextArea1.append("\tEND EVENT: "+endEventName+"\n");
-            }
-            this.jTextArea1.append("The desired end event is: "+this.parser.getDesiredEndEventLabel()+"\n");
+//            this.jTextArea1.append("The process has more than one end event, labeled as follows:\n");
+//            Iterator itr = parser.getEndEventLabels().iterator();
+//            while(itr.hasNext()) {
+//                String endEventName = (String)itr.next(); 
+//                this.jTextArea1.append("\tEND EVENT: "+endEventName+"\n");
+//            }
+//            this.jTextArea1.append("The a end event is: "+this.parser.getDesiredEndEventLabel()+"\n");
             
 //            itr = desiredEndEvents.iterator();
 //            while(itr.hasNext()){
 //                FlowNode element = (FlowNode)itr.next();
 //                this.jTextArea1.append("\tDESIRED END EVENT: "+element.getName()+"\n");
 //            }
-            this.jTextArea1.append("H2 is applicable\n\n");
+//            this.jTextArea1.append("H2 is applicable\n\n");
             
             if (parser.getAcceptableEndEventLabels().size()>1){
                 this.jTextArea1.append("There are at least two acceptable (non-exceptional) end events, labelled as follows: \n");
-                itr = parser.getAcceptableEndEventLabels().iterator();
+                Iterator itr = parser.getAcceptableEndEventLabels().iterator();
                 while(itr.hasNext()){
                     String evName = (String)itr.next();
                     this.jTextArea1.append(evName+"\n");
                 }
-                this.jTextArea1.append("H3 is applicable\n\n");
+                this.jTextArea1.append("Heuristic END_EVENTS is applicable\n\n");
                 heuristics[2]=1;
             }
             
@@ -449,7 +463,7 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
             
             if (parser.getExceptionalEndEvents().size()>0){
                 this.jTextArea1.append("The process has one or more exceptional end events, labeled as follows:\n");
-                itr = parser.getExceptionalEndEventLabels().iterator();
+                Iterator itr = parser.getExceptionalEndEventLabels().iterator();
                 while(itr.hasNext()){
                     String ev = (String)itr.next();
                     this.jTextArea1.append(ev+"\n");
@@ -458,17 +472,17 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
                 heuristics[3]=1;
             }
         }
-        if (parser.getActivityGroups().size()>1){
-            this.jTextArea1.append("The process has responsibility handoffs between the participants:\n");
-            Iterator itr = parser.getLanes().iterator();
-            while (itr.hasNext()){
-                Lane lane = (Lane)itr.next();
-                this.jTextArea1.append(lane.getName()+"\n");
-            }
-            this.jTextArea1.append("Heuristic H5 is applicable\n\n");
-            heuristics[4]=1;
-            
-        }
+//        if (parser.getActivityGroups().size()>1){
+//            this.jTextArea1.append("The process has responsibility handoffs between the participants:\n");
+//            Iterator itr = parser.getLanes().iterator();
+//            while (itr.hasNext()){
+//                Lane lane = (Lane)itr.next();
+//                this.jTextArea1.append(lane.getName()+"\n");
+//            }
+//            this.jTextArea1.append("Heuristic H5 is applicable\n\n");
+//            heuristics[4]=1;
+//            
+//        }
         
         if (parser.getExclusiveGateways().size()>0){
             this.jTextArea1.append("The process model contains one or more exclusive gateways:\n Heuristic H6 is applicable\n\n");
@@ -500,11 +514,12 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
 
     //TO DO: Make it work for several start events
     private void jButton5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton5ActionPerformed
-        this.jTextArea3.append("\nUsing the start and the end event, the resulting goal is: "+Heuristics.StartEndEvent((StartEvent)parser.getStartEvents().get(0),(EndEvent)parser.getDesiredEndEvent()));    
+        //this.jTextArea3.append("\nUsing the start and the end event, the resulting goal is: "+Heuristics.StartEndEvent((StartEvent)parser.getStartEvents().get(0),(EndEvent)parser.getDesiredEndEvent()));    
     }//GEN-LAST:event_jButton5ActionPerformed
 
     private void jButton6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton6ActionPerformed
-        this.jTextArea3.append("\nApplying H3, the resulting goal is: "+Heuristics.MultipleEndEvents((StartEvent)parser.getStartEvents().get(0),parser.getAcceptableEndEvents()));   
+        Fragment fragment = parser.getGatewayStructure();
+        this.jTextArea3.append("\nApplying H3, the resulting goal is: "+Heuristics.MultipleEndEvents(fragment));   
     }//GEN-LAST:event_jButton6ActionPerformed
 
     private void jButton7ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton7ActionPerformed
@@ -541,9 +556,34 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
 
     private void jButton10ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton10ActionPerformed
         // TODO add your handling code here:
-        this.jTextArea3.append("\nApplying Happy Path Heuristic, the resulting goals are: \n");
-        Fragment happyPath = parser.getHappyPath();
-        GoalModel goals = Heuristics.HappyPath(happyPath);
+//        this.jTextArea3.append("\nApplying Happy Path Heuristic, the resulting goals are: \n");
+//        Fragment happyPath = parser.getHappyPath();
+//        GoalModel goals = Heuristics.HappyPath(happyPath);
+//        System.out.println("number of goals in goal model:"+goals.getGoals().size());
+//        Iterator itr = goals.getGoals().iterator();
+//        while(itr.hasNext()){
+//            Goal goal = (Goal) itr.next();
+//            if (goal.hasRefinement()){
+//                this.jTextArea3.append(goal.getName()+" refinedInto ");
+//                RefinementRelation refinement = goal.getRefinements().get(0);
+//                Iterator iter = refinement.getChildGoals().iterator();
+//                while(iter.hasNext()){
+//                    Goal childGoal = (Goal)iter.next();
+//                    this.jTextArea3.append(childGoal.getName()+", ");
+//                }
+//            
+//            }
+//            else break;
+//        }
+
+    }//GEN-LAST:event_jButton10ActionPerformed
+
+    private void jButton11ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton11ActionPerformed
+        // TODO add your handling code here:
+        
+        this.jTextArea3.append("\nApplying Top Down Refinement, the resulting goals are: \n");
+        Fragment happyPath = parser.getHappyPathStructure();
+        GoalModel goals = Heuristics.TopDownRefinement(happyPath);
         System.out.println("number of goals in goal model:"+goals.getGoals().size());
         Iterator itr = goals.getGoals().iterator();
         while(itr.hasNext()){
@@ -561,7 +601,7 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
             else break;
         }
 
-    }//GEN-LAST:event_jButton10ActionPerformed
+    }//GEN-LAST:event_jButton11ActionPerformed
 
 
     /**
@@ -604,6 +644,7 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
     private javax.swing.JMenu fileMenu;
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton10;
+    private javax.swing.JButton jButton11;
     private javax.swing.JButton jButton2;
     private javax.swing.JButton jButton3;
     private javax.swing.JButton jButton4;
@@ -628,6 +669,7 @@ public class BPMNtoKAOS extends javax.swing.JFrame {
     private javax.swing.JToolBar.Separator jSeparator4;
     private javax.swing.JToolBar.Separator jSeparator5;
     private javax.swing.JToolBar.Separator jSeparator6;
+    private javax.swing.JToolBar.Separator jSeparator7;
     private javax.swing.JTable jTable1;
     private javax.swing.JTextArea jTextArea1;
     private javax.swing.JTextArea jTextArea3;

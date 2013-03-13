@@ -39,11 +39,14 @@ public class BPMNParser {
 
         setProcessEndEvents();
         
-        setProcessDefaultDesiredEndEvent();
+//        setProcessDefaultDesiredEndEvent();
 
         setProcessActivities();
 
         setProcessExclusiveGateways();
+        
+        setProcessParallelGateways();
+        
         
         setProcessLanes();
         
@@ -134,14 +137,14 @@ public class BPMNParser {
     }
     
     //call method only after SetProcessEndEvents
-    private void setProcessDefaultDesiredEndEvent(){
-        
-        try {
-            this.process.setDesiredEndEvent(this.process.getEndEvents().get(0));
-        } catch (Exception e) {
-            System.out.println("No End event found");
-        }
-    }
+//    private void setProcessDefaultDesiredEndEvent(){
+//        
+//        try {
+//            this.process.setDesiredEndEvent(this.process.getEndEvents().get(0));
+//        } catch (Exception e) {
+//            System.out.println("No End event found");
+//        }
+//    }
     private void setProcessActivities(){
         Element root = null;
         //holds all the lists of activities for each lane
@@ -277,6 +280,73 @@ public class BPMNParser {
             }
         }
     }
+    
+        private void setProcessParallelGateways(){
+        Element root = null;
+        //holds all the lists of activities for each lane
+        root = document.getRootElement();
+        for (Iterator i = root.elementIterator("process"); i.hasNext();) {
+            Element element = (Element) i.next();
+            for (Iterator j = element.elementIterator("parallelGateway"); j.hasNext();) {
+                Element parallelGateway = (Element) j.next();
+                ParallelGateway gateway = null;
+                
+                for (Iterator k = parallelGateway.attributeIterator(); k.hasNext();) {
+                        Attribute attribute = (Attribute) k.next();
+                        if (attribute.getName().equalsIgnoreCase("id")){ 
+                            gateway = new ParallelGateway(attribute.getValue());
+                            process.addParallelGateway(gateway);
+                           
+                        }
+                        else if (attribute.getName().equalsIgnoreCase("name")){ 
+                            gateway.setName(attribute.getValue());
+                            
+                        }
+                }
+                for (Iterator m = parallelGateway.elementIterator("incoming");m.hasNext();){
+                Element seqID = (Element) m.next();
+                //System.out.println("Processing seq flow with id "+ (String)seqID.getText());
+                List<SequenceFlow> incomingSeqFlow = new ArrayList();
+                if (process.getSequenceFlow((String)seqID.getText())!=null){
+                    //System.out.println("seq flow with id "+ (String)seqID.getText()+" already exists in the process");
+                    //System.out.println("Get existing seq from process "+ process.getSequenceFlow((String)seqID.getText()).getId());
+                    gateway.addIncoming(process.getSequenceFlow((String)seqID.getText()) );
+                    process.getSequenceFlow((String)seqID.getText()).setTarget(gateway);
+
+                }
+
+                else {
+                    //System.out.println("seq flow with id "+ (String)seqID.getText()+" does NOT exist in the process");
+                    SequenceFlow seq = new SequenceFlow((String)seqID.getText());
+                    seq.setTarget(gateway);
+                    this.process.addSequenceFlow(seq);
+                    gateway.addIncoming(seq);
+
+                }
+                    //System.out.println("Finished incoming for this task");
+               }
+                for (Iterator m = parallelGateway.elementIterator("outgoing");m.hasNext();){
+                Element seqID = (Element) m.next();
+                List<SequenceFlow> outgoingSeqFlow = new ArrayList();
+                //System.out.println("Processing seq flow with id "+ (String)seqID.getText());
+                if (process.getSequenceFlow((String)seqID.getText())!=null){
+                    gateway.addOutgoing( process.getSequenceFlow((String)seqID.getText()));
+                    process.getSequenceFlow((String)seqID.getText()).setSource(gateway);
+                    System.out.println("Adding seq "+ process.getSequenceFlow((String)seqID.getText()).getId()+ " to gateway "+ gateway.getName());
+                }
+                else {
+                    //System.out.println("seq flow with id "+ (String)seqID.getText()+" does NOT exist in the process");
+                    SequenceFlow seq = new SequenceFlow((String)seqID.getText());
+                    seq.setSource(gateway);
+                    this.process.addSequenceFlow(seq);
+                    gateway.addOutgoing(seq);
+
+                    }
+                }
+            }
+        }
+    }
+        
     private void setProcessLanes(){
         Element root = null;
         //holds all the lists of activities for each lane
@@ -316,6 +386,8 @@ public class BPMNParser {
             }
         }
     }
+    
+    
     private void setProcessSequenceFlows(){
         String currentID="";
         Element root = document.getRootElement();
@@ -434,6 +506,8 @@ public class BPMNParser {
     }
     //we consider the process name to be the name of the first participant in the XML
     
+    
+    
     private Fragment traverse(FlowNode node, Fragment fragment, Stack seqFlows) {
         Random generator = new Random();
         
@@ -453,13 +527,13 @@ public class BPMNParser {
             seqFlows.push(seq);
             return traverse(node.getOutgoing().get(0).getTarget(),fragment,seqFlows);
         }
-        else if (node instanceof ExclusiveGateway){
+        else if (node instanceof Gateway){
             fragment.addNode(node);
             SequenceFlow sequenceFlow = (SequenceFlow)seqFlows.pop();
             sequenceFlow.setTarget(node);
             fragment.addSequenceFlow(sequenceFlow);
             if(node.getOutgoing().size()>1){
-                System.out.println("Visited a diverging exclusive gateway");
+                System.out.println("Visited a diverging gateway");
                 Iterator itr = node.getOutgoing().iterator();
                 while (itr.hasNext()){
                     Integer id = generator.nextInt();
@@ -470,7 +544,7 @@ public class BPMNParser {
                 }
             }
             else {
-                System.out.println("Visited a converging exclusive gateway");
+                System.out.println("Visited a converging gateway");
                 Integer id = generator.nextInt();
                 SequenceFlow seq = node.getOutgoing().get(0);
                 SequenceFlow newSequenceFlow = new SequenceFlow(id.toString(),seq.getName(),node,null);
@@ -487,55 +561,159 @@ public class BPMNParser {
     }
 
 
-    //returns a fragment composed of All Start Events, All End Events and All Exclusive gateways
+    //returns a fragment composed of All Start Events, All End Events - Exceptional ones and All  Gateways
     public Fragment getGatewayStructure(){
         Fragment fragment = new Fragment();
         Stack seqFlows = new Stack();
-        return traverse(this.process.getStartEvents().get(0),fragment,seqFlows);
+        return traverseGatewaysAndActivities(this.process.getStartEvents().get(0),fragment,seqFlows);
     }
     
-    
-    public Fragment getHappyPath(){
+    //gets structure: acceptable end events, exclusive and parallel gateways -- Does not include activities!!!
+    private Fragment traverseGatewaysAndActivities(FlowNode node, Fragment fragment, Stack seqFlows){
         Random generator = new Random();
         
-        Fragment happyPath = new Fragment();
-        Fragment gatewayStructure = this.getGatewayStructure();
-        System.out.println(gatewayStructure.getFlowByTarget( this.process.getDesiredEndEvent()).get(0).getSource().getName());
-        
-        FlowNode current = this.process.getDesiredEndEvent();
-        happyPath.addNode(current);
-        Integer id = generator.nextInt();
-        SequenceFlow flow = new SequenceFlow(id.toString(),"", null,current);
-        while (!(current instanceof StartEvent)){    
-            flow.setName(gatewayStructure.getSequenceFlow(gatewayStructure.getFlowByTarget(current).get(0).getSource(), current).getName());
-            current = gatewayStructure.getFlowByTarget(current).get(0).getSource();
-            if (current instanceof ExclusiveGateway){
-                if (current.getOutgoing().size()>1){
-                    flow.setSource(current);
-                    
-                    happyPath.addNode(current);
-                    happyPath.addSequenceFlow(flow);
-                    id = generator.nextInt();
-                    flow = new SequenceFlow(id.toString(),"",null,current);
-
-                    happyPath.addNode(current.getIncoming().get(0).getSource());
-                    flow.setSource(current.getIncoming().get(0).getSource());
-                    happyPath.addSequenceFlow(flow);
-                    id = generator.nextInt();
-                    flow = new SequenceFlow(id.toString(),"",null,current.getIncoming().get(0).getSource());
-                  
-                    System.out.println("Adding nodes to happy path");
-                }    
+        if (node instanceof EndEvent){
+            if(process.isAcceptableEndEvent(node)){
+                fragment.addNode(node);
+                System.out.println("Visited an acceptable end event");
+                SequenceFlow sequenceFlow = (SequenceFlow)seqFlows.pop();
+                sequenceFlow.setTarget(node);
+                fragment.addSequenceFlow(sequenceFlow);
+                return fragment;
             }
+            return fragment; 
         }
-        flow.setSource(current);
-        happyPath.addSequenceFlow(flow);
-        happyPath.addNode(current);
+        else if(node instanceof StartEvent){
+            fragment.addNode(node);
+            System.out.println("Visited a Start Event. Stack size is "+seqFlows.size());
+            Integer id = generator.nextInt();
+            SequenceFlow seq = new SequenceFlow(id.toString(),node.getOutgoing().get(0).getName(),node,null);
+            seqFlows.push(seq);
+            return traverseGatewaysAndActivities(node.getOutgoing().get(0).getTarget(),fragment,seqFlows);
+        }
+//        else if ((node instanceof Activity)&&(node.getOutgoing().get(0).getTarget() instanceof ExclusiveGateway)){
+//            if (node.getOutgoing().get(0).getTarget().getOutgoing().size()>1){
+//                fragment.addNode(node);
+//                SequenceFlow sequenceFlow = (SequenceFlow)seqFlows.pop();
+//                sequenceFlow.setTarget(node);
+//                fragment.addSequenceFlow(sequenceFlow);
+//                Integer id = generator.nextInt();
+//                SequenceFlow seq = new SequenceFlow(id.toString(),node.getOutgoing().get(0).getName(),node,null);
+//                seqFlows.push(seq);
+//                return traverseGatewaysAndActivities(node.getOutgoing().get(0).getTarget(),fragment,seqFlows);
+//            }
+//            return traverseGatewaysAndActivities(node.getOutgoing().get(0).getTarget(),fragment,seqFlows);
+//        }
+            
+        else if (node instanceof ExclusiveGateway){
+            fragment.addNode(node);
+            SequenceFlow sequenceFlow = (SequenceFlow)seqFlows.pop();
+            sequenceFlow.setTarget(node);
+            fragment.addSequenceFlow(sequenceFlow);
+            if(node.getOutgoing().size()>1){
+                System.out.println("Visited a diverging exclusive gateway");
+                Iterator itr = node.getOutgoing().iterator();
+                while (itr.hasNext()){
+                    Integer id = generator.nextInt();
+                    SequenceFlow seq = (SequenceFlow)itr.next();
+                    SequenceFlow newSequenceFlow = new SequenceFlow(id.toString(),seq.getName(),node,null);
+                    seqFlows.push(newSequenceFlow);
+                    fragment = traverseGatewaysAndActivities(seq.getTarget(), fragment,seqFlows);
+                }
+            }
+            else  {
+                System.out.println("Visited a converging exclusive gateway");
+                Integer id = generator.nextInt();
+                SequenceFlow seq = node.getOutgoing().get(0);
+                SequenceFlow newSequenceFlow = new SequenceFlow(id.toString(),seq.getName(),node,null);
+                seqFlows.push(newSequenceFlow);
+                fragment = traverseGatewaysAndActivities(seq.getTarget(), fragment, seqFlows);
+                
+            }
+            
+            return fragment;
+        }
         
-        System.out.println("Fragment size "+ happyPath.size());
-        System.out.println("Seq flow number "+happyPath.getSequenceFlows().size());
-        return happyPath;
+        else if (node instanceof ParallelGateway){
+            fragment.addNode(node);
+            SequenceFlow sequenceFlow = (SequenceFlow)seqFlows.pop();
+            sequenceFlow.setTarget(node);
+            fragment.addSequenceFlow(sequenceFlow);
+            if(node.getOutgoing().size()>1){
+                System.out.println("Visited a diverging parallel gateway");
+                Iterator itr = node.getOutgoing().iterator();
+                while (itr.hasNext()){
+                    Integer id = generator.nextInt();
+                    SequenceFlow seq = (SequenceFlow)itr.next();
+                    SequenceFlow newSequenceFlow = new SequenceFlow(id.toString(),seq.getName(),node,null);
+                    seqFlows.push(newSequenceFlow);
+                    fragment = traverseGatewaysAndActivities(seq.getTarget(), fragment,seqFlows);
+                }
+            }
+            else  {
+                System.out.println("Visited a converging parallel gateway");
+                Integer id = generator.nextInt();
+                SequenceFlow seq = node.getOutgoing().get(0);
+                SequenceFlow newSequenceFlow = new SequenceFlow(id.toString(),seq.getName(),node,null);
+                seqFlows.push(newSequenceFlow);
+                fragment = traverseGatewaysAndActivities(seq.getTarget(), fragment, seqFlows);
+                
+            }
+            
+            return fragment;
+        }
+        
+        else return traverseGatewaysAndActivities(node.getOutgoing().get(0).getTarget(),fragment, seqFlows);
     }
+    
+    public Fragment getHappyPathStructure(){
+        Fragment fragment = new Fragment();
+        Stack seqFlows = new Stack();
+        return traverseGatewaysAndActivities(this.process.getStartEvents().get(0),fragment,seqFlows);
+    }
+    
+    
+//    public Fragment getHappyPath(){
+//        Random generator = new Random();
+//        
+//        Fragment happyPath = new Fragment();
+//        Fragment gatewayStructure = this.getGatewayStructure();
+//        System.out.println(gatewayStructure.getFlowByTarget( this.process.getDesiredEndEvent()).get(0).getSource().getName());
+//        
+//        FlowNode current = this.process.getDesiredEndEvent();
+//        happyPath.addNode(current);
+//        Integer id = generator.nextInt();
+//        SequenceFlow flow = new SequenceFlow(id.toString(),"", null,current);
+//        while (!(current instanceof StartEvent)){    
+//            flow.setName(gatewayStructure.getSequenceFlow(gatewayStructure.getFlowByTarget(current).get(0).getSource(), current).getName());
+//            current = gatewayStructure.getFlowByTarget(current).get(0).getSource();
+//            if (current instanceof ExclusiveGateway){
+//                if (current.getOutgoing().size()>1){
+//                    flow.setSource(current);
+//                    
+//                    happyPath.addNode(current);
+//                    happyPath.addSequenceFlow(flow);
+//                    id = generator.nextInt();
+//                    flow = new SequenceFlow(id.toString(),"",null,current);
+//
+//                    happyPath.addNode(current.getIncoming().get(0).getSource());
+//                    flow.setSource(current.getIncoming().get(0).getSource());
+//                    happyPath.addSequenceFlow(flow);
+//                    id = generator.nextInt();
+//                    flow = new SequenceFlow(id.toString(),"",null,current.getIncoming().get(0).getSource());
+//                  
+//                    System.out.println("Adding nodes to happy path");
+//                }    
+//            }
+//        }
+//        flow.setSource(current);
+//        happyPath.addSequenceFlow(flow);
+//        happyPath.addNode(current);
+//        
+//        System.out.println("Fragment size "+ happyPath.size());
+//        System.out.println("Seq flow number "+happyPath.getSequenceFlows().size());
+//        return happyPath;
+//    }
     
     //event methods
     public List<EndEvent> getEndEvents(){
@@ -551,17 +729,17 @@ public class BPMNParser {
         return endEventNames;
     }
     //takes the label of an end event and sets that end event to be the desired end event of the process.
-    public void setDesiredEndEvent(String label){
-        System.out.println("trying to get eventByName "+this.process.getEndEventByName(label));
-        this.process.setDesiredEndEvent(this.process.getEndEventByName(label));
-    }
-    //returns the label of the desired end event
-    public String getDesiredEndEventLabel(){
-        return this.process.getDesiredEndEvent().getName();
-    }
-    public EndEvent getDesiredEndEvent(){
-        return this.process.getDesiredEndEvent();
-    }
+//    public void setDesiredEndEvent(String label){
+//        System.out.println("trying to get eventByName "+this.process.getEndEventByName(label));
+//        this.process.setDesiredEndEvent(this.process.getEndEventByName(label));
+//    }
+//    //returns the label of the desired end event
+//    public String getDesiredEndEventLabel(){
+//        return this.process.getDesiredEndEvent().getName();
+//    }
+//    public EndEvent getDesiredEndEvent(){
+//        return this.process.getDesiredEndEvent();
+//    }
     //method gets the name of the end event and sets the event as an Exceptional End Event of teh process.
     public void setExceptionalEndEvents(List<String> names ){
         Iterator itr = names.iterator();
@@ -582,14 +760,7 @@ public class BPMNParser {
         return evNames;
     }   
     public List<EndEvent> getAcceptableEndEvents(){
-        List <EndEvent> acceptableEv = new ArrayList();
-        Iterator itr = this.process.getEndEvents().iterator();
-        while (itr.hasNext()){
-            EndEvent ev = (EndEvent) itr.next();
-            if (!this.process.getExceptionalEndEvents().contains((EndEvent)ev))
-                acceptableEv.add(ev);
-        }
-        return acceptableEv;
+        return this.process.getAcceptableEndEvents();
     }
     public List<EndEvent> getExceptionalEndEvents(){
         return this.process.getExceptionalEndEvents();

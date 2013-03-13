@@ -131,6 +131,34 @@ public class Fragment {
             return false;
         }
         
+        public ExclusiveGateway getExclusiveDivergingGateway(FlowNode last){
+            FlowNode current = last;
+            while(!(current instanceof StartEvent)){
+                if (this.getFlowByTarget(current).get(0).getSource() instanceof ExclusiveGateway)
+                    return (ExclusiveGateway)this.getFlowByTarget(current).get(0).getSource();
+                else current = this.getFlowByTarget(current).get(0).getSource();
+            }
+            System.out.println("Something went wrong trying to get Exclusive gateway - nothing was found");
+            return null;
+        }
+        
+        
+        /**
+     * returns the gateway right before the node
+     * @param node
+     * @return
+     */
+    public Gateway getPrecedingGateway(FlowNode node){
+             FlowNode current = node;
+             while(!(current instanceof StartEvent)){
+                if (this.getFlowByTarget(current).get(0).getSource() instanceof Gateway)
+                    return (Gateway)this.getFlowByTarget(current).get(0).getSource();
+                else current = this.getFlowByTarget(current).get(0).getSource();
+            }
+            System.out.println("Something went wrong trying to get gateway - nothing was found");
+            return null;
+        }
+        
         
         
     
